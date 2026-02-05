@@ -45,11 +45,12 @@ def main():
     t_max = 3.0
     n_rays = 10
     n_triangles = 9
+    angle = 5
 
     tri_seed = 0
     ray_seed = 0
 
-    def demo(t_max, n_rays, n_triangles, tri_seed, ray_seed):
+    def demo(t_max, n_rays, n_triangles, angle, tri_seed, ray_seed):
         key_tri = jax.random.PRNGKey(tri_seed)
         V_tris = (
             0.5 * jax.random.normal(key_tri, (3 * n_triangles, 3)) + center[None, :]
@@ -60,8 +61,8 @@ def main():
 
         key_ray = jax.random.PRNGKey(ray_seed)
         key_phi, key_theta = jax.random.split(key_ray)
-        phis = phi_ref + jnp.deg2rad(5) * jax.random.normal(key_phi, (n_rays))
-        thetas = theta_ref + jnp.deg2rad(5) * jax.random.normal(key_theta, (n_rays))
+        phis = phi_ref + jnp.deg2rad(angle) * jax.random.normal(key_phi, (n_rays))
+        thetas = theta_ref + jnp.deg2rad(angle) * jax.random.normal(key_theta, (n_rays))
         ray_targets = t_max * vmap(spherical_to_cartesian)(phis, thetas)
         ray_origins = jnp.repeat(origin[None, :], n_rays, axis=0)
         ray_dirs = vmap(normalize)(ray_targets - ray_origins)
@@ -99,22 +100,23 @@ def main():
         return V_tris, F_tris, V_ray, E_ray, hits
 
     V_tris, F_tris, V_ray, E_ray, hits = demo(
-        t_max, n_rays, n_triangles, tri_seed, ray_seed
+        t_max, n_rays, n_triangles, angle, tri_seed, ray_seed
     )
 
     def callback():
-        nonlocal t_max, n_rays, n_triangles, tri_seed, ray_seed
+        nonlocal t_max, n_rays, n_triangles, angle, tri_seed, ray_seed
 
         c0, t_max = psim.SliderFloat("t_max", t_max, 0.1, 5.0)
         c1, n_rays = psim.SliderInt("n_rays", n_rays, 1, 20)
         c2, n_triangles = psim.SliderInt("n_triangles", n_triangles, 1, 20)
-        c3, tri_seed = psim.SliderInt("tri_seed", tri_seed, 0, 20)
-        c4, ray_seed = psim.SliderInt("ray_seed", ray_seed, 0, 20)
+        c3, angle = psim.SliderFloat("angle", angle, 0, 20)
+        c4, tri_seed = psim.SliderInt("tri_seed", tri_seed, 0, 20)
+        c5, ray_seed = psim.SliderInt("ray_seed", ray_seed, 0, 20)
 
-        update = c0 | c1 | c2 | c3 | c4
+        update = c0 | c1 | c2 | c3 | c4 | c5
         if update:
             V_tris, F_tris, V_ray, E_ray, hits = demo(
-                t_max, n_rays, n_triangles, tri_seed, ray_seed
+                t_max, n_rays, n_triangles, angle, tri_seed, ray_seed
             )
             ps.register_point_cloud("hits", hits)
             ps.register_surface_mesh("V_tris", V_tris, F_tris)
