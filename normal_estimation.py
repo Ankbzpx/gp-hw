@@ -186,6 +186,7 @@ def main():
         V_proj = np.einsum("bi,ij", V_bar, eigvecs)
 
         half_extend = 0.5 * (V_proj.max(0) - V_proj.min(0))
+        # center is in eigvecs coordinate system, so it needs to be transformed back to world coordinate
         center = 0.5 * (V_proj.max(0) + V_proj.min(0))
 
         return (V_center + center @ eigvecs.T)[None, :] + np.einsum(
