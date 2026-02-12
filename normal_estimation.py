@@ -95,6 +95,36 @@ def main():
         "hand.off",
     ]
 
+    V_cube = np.array(
+        [
+            [-1, -1, 1],
+            [1, -1, 1],
+            [-1, 1, 1],
+            [1, 1, 1],
+            [-1, -1, -1],
+            [1, -1, -1],
+            [-1, 1, -1],
+            [1, 1, -1],
+        ]
+    )
+
+    F_cube = np.array(
+        [
+            [7, 6, 2],
+            [2, 3, 7],
+            [0, 4, 5],
+            [5, 1, 0],
+            [0, 2, 6],
+            [6, 4, 0],
+            [7, 3, 1],
+            [1, 5, 7],
+            [3, 2, 0],
+            [0, 1, 3],
+            [4, 6, 7],
+            [7, 5, 4],
+        ]
+    )
+
     def compute_normals(model_name, sample_size, k, noise_level, seed, use_svd, robust):
         V, F = igl.read_triangle_mesh(f"assets/{model_name}")
         V = normalize_aabb(V)
@@ -148,32 +178,77 @@ def main():
         model_list[model_idx], sample_size, k, sigma, seed, use_svd, robust
     )
 
+    def pca_bbox(V, F):
+        V_center = V.mean(0)
+        V_bar = V - V_center
+        _, eigvecs = np.linalg.eigh(V_bar.T @ V_bar)
+
+        V_proj = np.einsum("bi,ij", V_bar, eigvecs)
+
+        half_extend = 0.5 * (V_proj.max(0) - V_proj.min(0))
+        center = 0.5 * (V_proj.max(0) + V_proj.min(0))
+
+        return (V_center + center @ eigvecs.T)[None, :] + np.einsum(
+            "bj, ij->bi", V_cube * half_extend[None, :], eigvecs
+        )
+
+    V_obb = pca_bbox(V, F)
+
     def callback():
-        nonlocal model_idx, sample_size, k, sigma, seed, use_svd, robust
+        nonlocal \
+            model_idx, \
+            sample_size, \
+            k, \
+            sigma, \
+            seed, \
+            use_svd, \
+            robust, \
+            samples, \
+            neigh_indices
 
         c0, model_idx = psim.Combo("Models", model_idx, model_list)
         c1, sample_size = psim.SliderInt("Sample Size", sample_size, 50, 10000)
-        c2, k = psim.SliderInt("k", k, 3, 30)
+        c2, k = psim.SliderInt("k", k, 3, 100)
         c3, sigma = psim.SliderFloat("Sigma", sigma, 0, 1e-1)
         c4, seed = psim.SliderInt("Seed", seed, 0, 20)
         c5, use_svd = psim.Checkbox("Use SVD", use_svd)
         c6, robust = psim.Checkbox("Robust", robust)
 
         if c0 or c1 or c2 or c3 or c4 or c5 or c6:
+            ps.remove_curve_network("knn", False)
             V, F, samples, sample_normals, neigh_indices = compute_normals(
                 model_list[model_idx], sample_size, k, sigma, seed, use_svd, robust
             )
             ps.register_surface_mesh("Mesh", V, F)
-            ps.register_point_cloud("samples", samples).add_vector_quantity(
-                "sample_normals", sample_normals, enabled=True
-            )
+            ps.register_point_cloud(
+                "samples", samples, radius=3e-3
+            ).add_vector_quantity("sample_normals", sample_normals, enabled=True)
+
+            V_obb = pca_bbox(V, F)
+            ps.register_surface_mesh("OBB", V_obb, F_cube, transparency=0.2)
             if c0:
                 ps.reset_camera_to_home_view()
 
+        io = psim.GetIO()
+        if io.MouseClicked[0]:
+            screen_coords = io.MousePos
+            pick_result = ps.pick(screen_coords=screen_coords)
+
+            if pick_result.is_hit and pick_result.structure_name == "samples":
+                idx = pick_result.structure_data["index"]
+                neigh_idx = neigh_indices[idx]
+                V_neigh = samples[np.concatenate([np.array([idx]), neigh_idx])]
+                E_neigh = np.stack(
+                    [np.zeros((len(neigh_idx),)), np.arange(len(neigh_idx)) + 1],
+                    axis=-1,
+                )
+                ps.register_curve_network("knn", V_neigh, E_neigh, radius=2e-3)
+
     ps.init()
     ps.set_user_callback(callback)
+    ps.register_surface_mesh("OBB", V_obb, F_cube, transparency=0.2)
     ps.register_surface_mesh("Mesh", V, F)
-    ps.register_point_cloud("samples", samples).add_vector_quantity(
+    ps.register_point_cloud("samples", samples, radius=3e-3).add_vector_quantity(
         "sample_normals", sample_normals, enabled=True
     )
     ps.show()
