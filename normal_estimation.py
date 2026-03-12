@@ -243,15 +243,17 @@ def main():
                     [np.zeros((len(neigh_idx),)), np.arange(len(neigh_idx)) + 1],
                     axis=-1,
                 )
-                ps.register_curve_network("knn", V_neigh, E_neigh, radius=2e-3)
+                ps.register_curve_network(
+                    "knn", V_neigh, E_neigh, radius=2e-3, color=(0.0, 0.0, 0.0)
+                )
 
     ps.init()
     ps.set_user_callback(callback)
-    ps.register_surface_mesh("OBB", V_obb, F_cube, transparency=0.2)
     ps.register_surface_mesh("Mesh", V, F)
     ps.register_point_cloud("samples", samples, radius=3e-3).add_vector_quantity(
         "sample_normals", sample_normals, enabled=True
     )
+    ps.register_surface_mesh("OBB", V_obb, F_cube, transparency=0.2)
     ps.show()
 
 
