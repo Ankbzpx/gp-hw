@@ -441,10 +441,11 @@ def compute_laplacian(model_name):
         (weights_uniform, (idx_i, idx_j)), shape=(NV, NV)
     ).tocsc()
 
-    kappa_H = vmap(jnp.linalg.norm)(0.5 * M_inv @ L @ V)
-
-    VN_L = -L @ V
+    VN_L = -0.5 * M_inv @ L @ V
     VN_A = -A @ V
+
+    dp = jnp.einsum("nd,nd->n", VN, VN_L)
+    kappa_H = jnp.sign(dp) * vmap(jnp.linalg.norm)(VN_L)
 
     # kappa_G = kappa_1 * kappa_2
     # kappa_H = 0.5 * (kappa_1 + kappa_2)
