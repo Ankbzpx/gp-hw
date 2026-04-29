@@ -62,7 +62,7 @@ def load_and_downsample_pc(pc_path):
     voxel_size = dim_min / 128
 
     pc_o3d = pc_o3d.voxel_down_sample(voxel_size=voxel_size)
-    pc_o3d = pc_o3d.farthest_point_down_sample(16384)
+    # pc_o3d = pc_o3d.farthest_point_down_sample(16384)
     pc = np.asarray(pc_o3d.points)
     return pc, voxel_size
 
@@ -84,6 +84,14 @@ def main():
 
     idx_pick = 0
     tags = ["01", "02", "03", "04", "05"]
+
+    for tag in tags:
+        print(tag)
+        pc_path = f"assets/pc/{tag}.ply"
+        pc, voxel_size = load_and_downsample_pc(pc_path)
+        eps = voxel_size
+        pc_clusters, reminder = cluster_planes(pc, eps, max_clusters)
+
     pc_path = f"assets/pc/{tags[idx_pick]}.ply"
 
     pc, voxel_size = load_and_downsample_pc(pc_path)
@@ -102,6 +110,7 @@ def main():
             pc, voxel_size = load_and_downsample_pc(pc_path)
             eps = voxel_size
             pc_clusters, reminder = cluster_planes(pc, eps, max_clusters)
+            ps.reset_camera_to_home_view()
             for i in range(len(pc_clusters)):
                 ps.register_point_cloud(f"plane_{i}", pc_clusters[i]).add_to_group(
                     group
